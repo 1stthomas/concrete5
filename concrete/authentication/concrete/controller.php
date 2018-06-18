@@ -1,22 +1,22 @@
 <?php
-
 namespace Concrete\Authentication\Concrete;
 
 use Concrete\Core\Authentication\AuthenticationTypeController;
 use Concrete\Core\Support\Facade\Application;
+use Concrete\Core\User\User;
+use Concrete\Core\User\ValidationHash;
 use Concrete\Core\Validation\CSRF\Token;
 use Config;
-use Exception;
-use Database;
 use Core;
-use Concrete\Core\User\User;
+use Database;
+use Exception;
+use Session;
 use UserInfo;
 use View;
-use Session;
 
 class Controller extends AuthenticationTypeController
 {
-    public $apiMethods = array('forgot_password', 'v', 'change_password', 'password_changed', 'email_validated', 'invalid_token', 'required_password_upgrade');
+    public $apiMethods = ['forgot_password', 'v', 'change_password', 'password_changed', 'email_validated', 'invalid_token', 'required_password_upgrade'];
 
     public function getHandle()
     {
@@ -30,7 +30,7 @@ class Controller extends AuthenticationTypeController
             list($uID, $authType, $hash) = explode(':', $cookie);
             if ($authType == 'concrete') {
                 $db = Database::connection();
-                $db->executeQuery('DELETE FROM authTypeConcreteCookieMap WHERE uID=? AND token=?', array($uID, $hash));
+                $db->executeQuery('DELETE FROM authTypeConcreteCookieMap WHERE uID=? AND token=?', [$uID, $hash]);
             }
         }
     }
@@ -46,14 +46,14 @@ class Controller extends AuthenticationTypeController
         $db = Database::connection();
         $q = $db->fetchColumn(
             'SELECT validThrough FROM authTypeConcreteCookieMap WHERE uID=? AND token=?',
-            array($uID, $hash)
+            [$uID, $hash]
         );
         $bool = time() < $q;
         if (!$bool) {
-            $db->executeQuery('DELETE FROM authTypeConcreteCookieMap WHERE uID=? AND token=?', array($uID, $hash));
+            $db->executeQuery('DELETE FROM authTypeConcreteCookieMap WHERE uID=? AND token=?', [$uID, $hash]);
         } else {
             $newTime = strtotime('+2 weeks');
-            $db->executeQuery('UPDATE authTypeConcreteCookieMap SET validThrough=?', array($newTime));
+            $db->executeQuery('UPDATE authTypeConcreteCookieMap SET validThrough=?', [$newTime]);
         }
 
         return $bool;
@@ -77,7 +77,7 @@ class Controller extends AuthenticationTypeController
         try {
             $db->executeQuery(
                 'INSERT INTO authTypeConcreteCookieMap (token, uID, validThrough) VALUES (?,?,?)',
-                array($token, $u->getUserID(), $validThrough)
+                [$token, $u->getUserID(), $validThrough]
             );
         } catch (\Exception $e) {
             // HOLY CRAP.. SERIOUSLY?
@@ -131,7 +131,7 @@ class Controller extends AuthenticationTypeController
 
     public function isAuthenticated(User $u)
     {
-        return $u->isLoggedIn();
+        return $u->isRegistered();
     }
 
     public function saveAuthenticationType($values)
@@ -144,8 +144,8 @@ class Controller extends AuthenticationTypeController
     public function required_password_upgrade()
     {
         $email = $this->post('uEmail');
-	    $token = $this->app->make(Token::class);
-	    $this->set('token', $token);
+        $token = $this->app->make(Token::class);
+        $this->set('token', $token);
 
         if ($email) {
             $errorValidator = Core::make('helper/validation/error');
@@ -201,7 +201,7 @@ class Controller extends AuthenticationTypeController
                     $mh->to($oUser->getUserEmail());
 
                     //generate hash that'll be used to authenticate user, allowing them to change their password
-                    $h = new \Concrete\Core\User\ValidationHash();
+                    $h = new ValidationHash();
                     $uHash = $h->add($oUser->getUserID(), intval(UVTYPE_CHANGE_PASSWORD), true);
                     $changePassURL = View::url(
                         '/login',
@@ -248,18 +248,15 @@ class Controller extends AuthenticationTypeController
     public function change_password($uHash = '')
     {
         $this->set('authType', $this->getAuthenticationType());
-        $db = Database::connection();
-        $h = Core::make('helper/validation/identifier');
         $e = Core::make('helper/validation/error');
-        $ui = UserInfo::getByValidationHash($uHash);
+        if (is_string($uHash)) {
+            $ui = UserInfo::getByValidationHash($uHash);
+        } else {
+            $ui = null;
+        }
         if (is_object($ui)) {
-            $hashCreated = $db->fetchColumn('SELECT uDateGenerated FROM UserValidationHashes WHERE uHash=?', array($uHash));
-            if ($hashCreated < (time() - (USER_CHANGE_PASSWORD_URL_LIFETIME))) {
-                $h->deleteKey('UserValidationHashes', 'uHash', $uHash);
-                throw new \Exception(
-                    t(
-                        'Key Expired. Please visit the forgot password page again to have a new key generated.'));
-            } else {
+            $vh = new ValidationHash();
+            if ($vh->isValid($uHash)) {
                 if (isset($_POST['uPassword']) && strlen($_POST['uPassword'])) {
                     Core::make('validator/password')->isValid($_POST['uPassword'], $e);
 
@@ -269,28 +266,21 @@ class Controller extends AuthenticationTypeController
 
                     if (!$e->has()) {
                         $ui->changePassword($_POST['uPassword']);
+                        $h = Core::make('helper/validation/identifier');
                         $h->deleteKey('UserValidationHashes', 'uHash', $uHash);
                         $this->set('passwordChanged', true);
 
-                        $this->redirect(
-                            '/login',
-                            $this->getAuthenticationType()->getAuthenticationTypeHandle(),
-                            'password_changed');
+                        $this->redirect('/login', $this->getAuthenticationType()->getAuthenticationTypeHandle(), 'password_changed');
                     } else {
-                        $this->set('uHash', $uHash);
-                        $this->set('authTypeElement', 'change_password');
                         $this->set('error', $e);
                     }
-                } else {
-                    $this->set('uHash', $uHash);
-                    $this->set('authTypeElement', 'change_password');
                 }
+                $this->set('uHash', $uHash);
+                $this->set('authTypeElement', 'change_password');
+                return;
             }
-        } else {
-            throw new \Exception(
-                t(
-                    'Invalid Key. Please visit the forgot password page again to have a new key generated.'));
         }
+        $this->redirect('/login', $this->getAuthenticationType()->getAuthenticationTypeHandle(), 'invalid_token');
     }
 
     public function password_changed()
@@ -326,7 +316,7 @@ class Controller extends AuthenticationTypeController
 
         /** @var \Concrete\Core\Permission\IPService $ip_service */
         $ip_service = Core::make('ip');
-        if ($ip_service->isBanned()) {
+        if ($ip_service->isBlacklisted()) {
             throw new \Exception($ip_service->getErrorMessage());
         }
 
@@ -343,9 +333,9 @@ class Controller extends AuthenticationTypeController
                     break;
                 case USER_INVALID:
                     // Log failed auth
-                    $ip_service->logSignupRequest();
-                    if ($ip_service->signupRequestThresholdReached()) {
-                        $ip_service->createIPBan();
+                    $ip_service->logFailedLogin();
+                    if ($ip_service->failedLoginsThresholdReached()) {
+                        $ip_service->addToBlacklistForThresholdReached();
                         throw new \Exception($ip_service->getErrorMessage());
                     }
 
@@ -377,7 +367,11 @@ class Controller extends AuthenticationTypeController
         $app = Application::getFacadeApplication();
         $db = $app['database']->connection();
 
-        return $db->GetOne('select uIsPasswordReset from Users where uName = ?', array($this->post('uName')));
+        if (Config::get('concrete.user.registration.email_registration')) {
+            return $db->GetOne('select uIsPasswordReset from Users where uEmail = ?', [$this->post('uName')]);
+        } else {
+            return $db->GetOne('select uIsPasswordReset from Users where uName = ?', [$this->post('uName')]);
+        }
     }
 
     public function v($hash = '')

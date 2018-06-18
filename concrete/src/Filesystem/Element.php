@@ -31,6 +31,12 @@ class Element implements LocatableFileInterface
     {
         $this->element = $element;
         $args = func_get_args();
+        $this->populateFromArguments($args);
+        $this->locator = $this->createLocator();
+    }
+
+    public function populateFromArguments($args)
+    {
         if (count($args) > 1) {
             for ($i = 1; $i < count($args); $i++) {
                 $arg = $args[$i];
@@ -48,7 +54,6 @@ class Element implements LocatableFileInterface
                 }
             }
         }
-        $this->locator = $this->createLocator();
     }
 
     protected function getBaseLocator()
@@ -89,7 +94,7 @@ class Element implements LocatableFileInterface
         } else {
             $element = $this->element;
         }
-        return DIRNAME_ELEMENTS . DIRECTORY_SEPARATOR . $element . '.php';
+        return DIRNAME_ELEMENTS . '/' . $element . '.php';
     }
 
     public function exists()
@@ -115,7 +120,7 @@ class Element implements LocatableFileInterface
     public function getElementController()
     {
         if (!isset($this->controller)) {
-            $path = DIRNAME_CONTROLLERS . DIRECTORY_SEPARATOR . 'element' . DIRECTORY_SEPARATOR . $this->element
+            $path = DIRNAME_CONTROLLERS . '/element/' . $this->element
                 . '.php';
             $class = 'Controller\\Element';
             $segments = explode('/', $this->element);

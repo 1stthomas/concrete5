@@ -46,11 +46,14 @@ class Controller extends DefaultController
         if ($this->akTextareaDisplayMode == 'text') {
             return parent::getDisplayValue();
         }
+        if ($this->akTextareaDisplayMode == 'rich_text') {
+          return htmLawed($this->getAttributeValue()->getValue(), array('safe' => 1));
+        }
 
         return htmLawed($this->getAttributeValue()->getValue(), array('safe' => 1, 'deny_attribute' => 'style'));
     }
 
-    public function form($additionalClass = false)
+    public function form()
     {
         $this->load();
 
@@ -58,12 +61,8 @@ class Controller extends DefaultController
         if (is_object($this->attributeValue)) {
             $value = $this->getAttributeValue()->getValue();
         }
-        // switch display type here
-        if ($this->akTextareaDisplayMode == 'text' || $this->akTextareaDisplayMode == '') {
-            echo Core::make('helper/form')->textarea($this->field('value'), $value, array('class' => $additionalClass, 'rows' => 5));
-        } else {
-            echo Core::make('editor')->outputStandardEditor($this->field('value'), $value);
-        }
+        $this->set('akTextareaDisplayMode', $this->akTextareaDisplayMode);
+        $this->set('value', $value);
     }
 
     public function composer()

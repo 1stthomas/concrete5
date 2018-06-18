@@ -28,6 +28,7 @@ use Concrete\Core\Express\Form\Validator\Routine\CaptchaRoutine;
 use Concrete\Core\Express\Form\Validator\ValidatorInterface;
 use Concrete\Core\Express\Generator\EntityHandleGenerator;
 use Concrete\Core\File\FileProviderInterface;
+use Concrete\Core\File\Filesystem;
 use Concrete\Core\File\Set\Set;
 use Concrete\Core\Form\Context\ContextFactory;
 use Concrete\Core\Http\ResponseAssetGroup;
@@ -45,7 +46,7 @@ class Controller extends BlockController implements NotificationProviderInterfac
 {
     protected $btInterfaceWidth = 640;
     protected $btCacheBlockOutput = false;
-    protected $btInterfaceHeight = 480;
+    protected $btInterfaceHeight = 700;
     protected $btTable = 'btExpressForm';
     protected $entityManager;
 
@@ -84,6 +85,10 @@ class Controller extends BlockController implements NotificationProviderInterfac
         $this->set('thankyouMsg', t('Thanks!'));
         $this->edit();
         $this->set('resultsFolder', $this->get('formResultsRootFolderNodeID'));
+
+        $filesystem = new Filesystem();
+        $addFilesToFolder = $filesystem->getRootFolder();
+        $this->set('addFilesToFolder', $addFilesToFolder);
     }
 
     public function getNotifications()
@@ -105,15 +110,18 @@ class Controller extends BlockController implements NotificationProviderInterfac
     public function delete()
     {
         parent::delete();
-        $entity = $this->getFormEntity()->getEntity();
-        $entityManager = \Core::make('database/orm')->entityManager();
-        // Important – are other blocks in the system using this form? If so, we don't want to delete it!
-        $db = $entityManager->getConnection();
-        $r = $db->fetchColumn('select count(bID) from btExpressForm where bID <> ? and exFormID = ?', [$this->bID, $this->exFormID]);
-        if ($r == 0) {
-            $entityManager->remove($entity);
-            $entityManager->flush();
-        }
+	    $form = $this->getFormEntity();
+	    if (is_object($form)) {
+		    $entity = $form->getEntity();
+		    $entityManager = \Core::make('database/orm')->entityManager();
+		    // Important – are other blocks in the system using this form? If so, we don't want to delete it!
+		    $db = $entityManager->getConnection();
+		    $r = $db->fetchColumn('select count(bID) from btExpressForm where bID <> ? and exFormID = ?', [$this->bID, $this->exFormID]);
+		    if ($r == 0) {
+			    $entityManager->remove($entity);
+			    $entityManager->flush();
+		    }
+	    }
     }
 
 
@@ -153,7 +161,7 @@ class Controller extends BlockController implements NotificationProviderInterfac
                     $antispam = \Core::make('helper/validation/antispam');
                     $submittedData = '';
                     foreach($values as $value) {
-                        $submittedData .= $value->getAttributeKey()->getAttributeKeyDisplayName() . ":\r\n";
+                        $submittedData .= $value->getAttributeKey()->getAttributeKeyDisplayName('text') . ":\r\n";
                         $submittedData .= $value->getPlainTextValue() . "\r\n\r\n";
                     }
 
@@ -168,19 +176,16 @@ class Controller extends BlockController implements NotificationProviderInterfac
                         return $r;
                     }
 
+                    // Handle file based items
+                    $set = null;
+                    $folder = null;
+                    $filesystem = new Filesystem();
+                    $rootFolder = $filesystem->getRootFolder();
                     if ($this->addFilesToSet) {
                         $set = Set::getByID($this->addFilesToSet);
-                        if (is_object($set)) {
-                            foreach($values as $value) {
-                                $value = $value->getValueObject();
-                                if ($value instanceof FileProviderInterface) {
-                                    $files = $value->getFileObjects();
-                                    foreach($files as $file) {
-                                        $set->addFileToSet($file);
-                                    }
-                                }
-                            }
-                        }
+                    }
+                    if ($this->addFilesToFolder) {
+                        $folder = $filesystem->getFolder($this->addFilesToFolder);
                     }
 
                     $entityManager->refresh($entry);
@@ -188,6 +193,24 @@ class Controller extends BlockController implements NotificationProviderInterfac
                     $notifier = $controller->getNotifier($this);
                     $notifications = $notifier->getNotificationList();
                     $notifier->sendNotifications($notifications, $entry, ProcessorInterface::REQUEST_TYPE_ADD);
+
+                    foreach($values as $value) {
+                        $value = $value->getValueObject();
+                        if ($value instanceof FileProviderInterface) {
+                            $files = $value->getFileObjects();
+                            foreach($files as $file) {
+                                if ($set) {
+                                    $set->addFileToSet($file);
+                                }
+                                if ($folder && $folder->getTreeNodeID() != $rootFolder->getTreeNodeID()) {
+                                    $fileNode = $file->getFileNodeObject();
+                                    if ($fileNode) {
+                                        $fileNode->move($folder);
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     $r = null;
                     if ($this->redirectCID > 0) {
@@ -363,11 +386,12 @@ class Controller extends BlockController implements NotificationProviderInterfac
         $session = \Core::make('session');
         $sessionControls = $session->get('block.express_form.new');
 
+        $name = $data['formName'] ? $data['formName'] : t('Form');
+
         if (!$this->exFormID) {
 
             // This is a new submission.
             $c = \Page::getCurrentPage();
-            $name = $data['formName'] ? $data['formName'] : t('Form');
 
             // Create a results node
             $node = ExpressEntryCategory::getNodeByName(self::FORM_RESULTS_CATEGORY_NAME);
@@ -407,6 +431,13 @@ class Controller extends BlockController implements NotificationProviderInterfac
              */
             $field_set = $form->getFieldSets()[0];
             $entity = $form->getEntity();
+            $entity->setName($name);
+            $entityManager->persist($entity);
+            $entityManager->flush();
+
+            $nodeId = $entity->getEntityResultsNodeId();
+            $node = Node::getByID($nodeId);
+            $node->setTreeNodeName($name);
         }
 
         $attributeKeyCategory = $entity->getAttributeKeyCategory();
@@ -532,6 +563,7 @@ class Controller extends BlockController implements NotificationProviderInterfac
         $category = new ExpressCategory($entity, \Core::make('app'), $entityManager);
         $indexer = $category->getSearchIndexer();
         foreach($indexKeys as $key) {
+            $entityManager->refresh($key->getAttributeType()); // The key might not be fully initialized and it might be coming from session and might not have all the right info in it. This is to fix a bug where packaged attribute types weren't being seen as being in a package because the package handle property on the object wasn't set.
             $indexer->updateRepositoryColumns($category, $key);
         }
 
@@ -542,6 +574,23 @@ class Controller extends BlockController implements NotificationProviderInterfac
             $resultsNode->move($folder);
         }
 
+        // File manager folder
+        $addFilesToFolderFromPost = $data['addFilesToFolder'];
+        $existingAddFilesToFolder = $this->addFilesToFolder;
+        unset($data['addFilesToFolder']);
+
+        if ($addFilesToFolderFromPost && $addFilesToFolderFromPost != $existingAddFilesToFolder) {
+            $filesystem = new Filesystem();
+            $addFilesToFolder = $filesystem->getFolder($addFilesToFolderFromPost);
+            $fp = new \Permissions($addFilesToFolder);
+            if ($fp->canSearchFiles()) {
+                $data['addFilesToFolder'] = $addFilesToFolderFromPost;
+            }
+        }
+
+        if (!$data['addFilesToFolder']) {
+            $data['addFilesToFolder'] = $existingAddFilesToFolder;
+        }
 
         $data['exFormID'] = $form->getId();
 
@@ -593,6 +642,16 @@ class Controller extends BlockController implements NotificationProviderInterfac
         $this->set('types_select', $select);
         $tree = ExpressEntryResults::get();
         $this->set('tree', $tree);
+        $addFilesToFolder = null;
+        
+        if ($this->addFilesToFolder) {
+            $filesystem = new Filesystem();
+            $addFilesToFolder = $filesystem->getFolder($this->addFilesToFolder);
+            $fp = new \Permissions($addFilesToFolder);
+            if ($fp->canSearchFiles()) {
+                $this->set('addFilesToFolder', $addFilesToFolder);
+            }
+        }
 
         $this->set('entities', Express::getEntities());
     }

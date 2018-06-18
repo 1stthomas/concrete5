@@ -23,7 +23,7 @@
             <?php echo $form->text('location', $location);?>
             <?php echo $form->hidden('latitude', $latitude);?>
             <?php echo $form->hidden('longitude', $longitude);?>
-            <div id="block_note" class="note"><?php echo t('Start typing a location (e.g. Apple Store or 235 W 3rd, New York) then click on the correct entry on the list.')?></div>
+            <div id="block_note" class="help-block"><?php echo t('Start typing a location (e.g. Apple Store or 235 W 3rd, New York) then click on the correct entry on the list.')?></div>
             <div id="map-canvas"></div>
         </div>
     </div>
@@ -65,19 +65,25 @@
 
     <div class="col-xs-12">
         <div class="form-group">
-          <label>
-            <?php echo $form->checkbox('scrollwheel', 1, (is_null($scrollwheel) || $scrollwheel)); ?>
-            <?php echo t("Enable Scroll Wheel")?>
-          </label>
+            <div class="checkbox">
+                <label>
+                <?php
+                echo $form->checkbox('scrollwheel', 1, (is_null($scrollwheel) || $scrollwheel));
+                echo t('Enable Scroll Wheel');
+                ?>
+                </label>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
+var isCheckKeyRunning = false;
 var validKey;
 function gm_authFailure() {
     $('#check-spinner').removeClass('fa-refresh fa-spin').addClass('fa-play');
     alert('<?php echo t('Invalid API Key'); ?>');
+    isCheckKeyRunning = false;
     validKey = false;
 }
 
@@ -86,26 +92,30 @@ function gm_authFailure() {
 
     var checkKey = function() {
         $('#ccm-google-map-key').click(function() {
-            validKey = true;
-            $('#check-spinner').removeClass('fa-play').addClass('fa-refresh fa-spin');
+            if (!isCheckKeyRunning) {
+                isCheckKeyRunning = true;
+                validKey = true;
+                $('#check-spinner').removeClass('fa-play').addClass('fa-refresh fa-spin');
 
-            $('#location').removeAttr('placeholder autocomplete disabled style');
-            $('#location').removeClass('gm-err-autocomplete');
+                $('#location').removeAttr('placeholder autocomplete disabled style');
+                $('#location').removeClass('gm-err-autocomplete');
 
-            var apiKey = $('#apiKey').val().trim();
-            if ($('#apiKeyCheck')) {
-                $('#apiKeyCheck').remove();
-            }
-            $('body').append('<script id="apiKeyCheck" src="https://maps.googleapis.com/maps/api/js?' +
-                'key=' + apiKey +
-                '&libraries=places" <\/script>'
-            );
-            setTimeout(function() {
-                if (validKey) {
-                    window.C5GMaps.init();
-                    isValidKey();
+                var apiKey = $('#apiKey').val().trim();
+                if ($('#apiKeyCheck')) {
+                    $('#apiKeyCheck').remove();
                 }
-            }, 10000);
+                $('body').append('<script id="apiKeyCheck" src="https://maps.googleapis.com/maps/api/js?' +
+                    'key=' + apiKey +
+                    '&libraries=places" <\/script>'
+                );
+                setTimeout(function() {
+                    if (validKey) {
+                        window.C5GMaps.init();
+                        isValidKey();
+                        isCheckKeyRunning = false;
+                    }
+                }, 10000);
+            }
         });
     };
     checkKey();
@@ -170,7 +180,7 @@ function gm_authFailure() {
                 var place = autocomplete.getPlace();
                 if (!place.geometry) {
                     // Inform the user that the place was not found and return.
-                    input.className = 'notfound';
+                    input.className = 'notfound form-control ccm-input-text';
                     note.innerHTML = 'The place you entered could not be found.';
                     return;
                 } else {

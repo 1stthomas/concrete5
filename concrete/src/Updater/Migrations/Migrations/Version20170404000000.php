@@ -1,14 +1,18 @@
 <?php
+
 namespace Concrete\Core\Updater\Migrations\Migrations;
 
-use Concrete\Core\Page\Page;
-use Concrete\Core\Page\Single as SinglePage;
 use Concrete\Core\Updater\Migrations\AbstractMigration;
-use Doctrine\DBAL\Schema\Schema;
+use Concrete\Core\Updater\Migrations\RepeatableMigrationInterface;
 
-class Version20170404000000 extends AbstractMigration
+class Version20170404000000 extends AbstractMigration implements RepeatableMigrationInterface
 {
-    public function up(Schema $schema)
+    /**
+     * {@inheritdoc}
+     *
+     * @see \Concrete\Core\Updater\Migrations\AbstractMigration::upgradeDatabase()
+     */
+    public function upgradeDatabase()
     {
         $timezone = \Config::get('app.timezone');
         if ($timezone) {
@@ -19,16 +23,6 @@ class Version20170404000000 extends AbstractMigration
         }
 
         // Add the new dashboard page to update language files
-        $sp = Page::getByPath('/dashboard/system/basics/multilingual/update');
-        if (!is_object($sp) || $sp->isError()) {
-            $sp = SinglePage::add('/dashboard/system/basics/multilingual/update');
-            $sp->update(['cName' => 'Update Languages']);
-            $sp->setAttribute('exclude_nav', true);
-            $sp->setAttribute('meta_keywords', 'languages, update, gettext, translation');
-        }
-    }
-
-    public function down(Schema $schema)
-    {
+        $this->createSinglePage('/dashboard/system/basics/multilingual/update', 'Update Languages', ['exclude_nav' => true, 'meta_keywords' => 'languages, update, gettext, translation']);
     }
 }

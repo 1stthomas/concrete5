@@ -18,6 +18,7 @@ class Search extends DashboardPageController
 
         $header = new Header();
         $this->set('headerMenu', $header);
+        $this->set('breadcrumbClass', 'ccm-file-manager-breadcrumb');
         $this->requireAsset('core/file-manager');
         $this->requireAsset('core/imageeditor');
 
@@ -30,6 +31,7 @@ class Search extends DashboardPageController
             $search = new FileFolder();
             $search->search();
             $result = $search->getSearchResultObject();
+            
         }
 
         if (is_object($result)) {

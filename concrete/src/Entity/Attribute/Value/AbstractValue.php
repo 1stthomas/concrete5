@@ -60,6 +60,11 @@ abstract class AbstractValue implements AttributeValueInterface
         return $controller;
     }
 
+    public function __destruct()
+    {
+        unset($this->attribute_key);
+    }
+
     /**
      * @return \Concrete\Core\Entity\Attribute\Value\Value\Value
      */
@@ -143,7 +148,11 @@ abstract class AbstractValue implements AttributeValueInterface
         }
 
         // Legacy support.
-        return $controller->getValue();
+        if (method_exists($controller, 'getValue')) {
+            return $controller->getValue();
+        }
+
+        return '';
     }
 
     /**

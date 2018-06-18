@@ -1,7 +1,7 @@
 <?php
 namespace Concrete\Core\Foundation\Repetition;
 
-interface RepetitionInterface
+interface RepetitionInterface extends \JsonSerializable
 {
     /**
      * Repeat constants.
@@ -154,11 +154,6 @@ interface RepetitionInterface
      * @return mixed
      */
     public function getTextRepresentation();
-
-    /**
-     * @return bool Success or failure
-     */
-    public function save();
 
     /**
      * Get all active time slots that start within two time periods.

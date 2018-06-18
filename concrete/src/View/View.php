@@ -204,26 +204,61 @@ class View extends AbstractView
 
     public function renderViewContents($scopeItems)
     {
-        extract($scopeItems);
+        $contents = '';
+
+        // Render the main view file
         if ($this->innerContentFile) {
-            ob_start();
-            include $this->innerContentFile;
-            $innerContent = ob_get_contents();
-            ob_end_clean();
+            $contents = $this->renderInnerContents($scopeItems);
         }
 
+        // Render the template around it
         if (file_exists($this->template)) {
-            ob_start();
-            $this->onBeforeGetContents();
-            include $this->template;
-            $this->onAfterGetContents();
-            $contents = ob_get_contents();
-            ob_end_clean();
-
-            return $contents;
-        } else {
-            return $innerContent;
+            $contents = $this->renderTemplate($scopeItems, $contents);
         }
+
+        return $contents;
+    }
+
+    /**
+     * Render the file set to $this->innerContentFile
+     * @param $scopeItems
+     * @return string
+     */
+    protected function renderInnerContents($scopeItems)
+    {
+        // Extract the items into the current scope
+        extract($scopeItems);
+
+        ob_start();
+        include $this->innerContentFile;
+        $innerContent = ob_get_contents();
+        ob_end_clean();
+
+        return $innerContent;
+    }
+
+    /**
+     * Render the file set to $this->template
+     * @param $scopeItems
+     * @return string
+     */
+    protected function renderTemplate($scopeItems, $innerContent)
+    {
+        // Extract the items into the current scope
+        extract($scopeItems);
+
+        ob_start();
+
+        // Fire a `before` event
+        $this->onBeforeGetContents();
+        include $this->template;
+
+        // Fire an `after` event
+        $this->onAfterGetContents();
+        $contents = ob_get_contents();
+        ob_end_clean();
+
+        return $contents;
     }
 
     public function finishRender($contents)
@@ -379,11 +414,13 @@ class View extends AbstractView
         $view = self::getRequestInstance();
 
         $_c = Page::getCurrentPage();
+        $_app = Facade::getFacadeApplication();
         if (is_object($_c)) {
             $_theme = $_c->getCollectionThemeObject();
+        } else if ($_app->isInstalled()) {
+            $_theme = PageTheme::getSiteTheme();
         }
 
-        $_app = Facade::getFacadeApplication();
         $_fs = $_app->make(Filesystem::class);
         $_locator = new FileLocator($_fs, $_app);
         if (isset($_theme) && is_object($_theme)) {

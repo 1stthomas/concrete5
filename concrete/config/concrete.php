@@ -6,9 +6,9 @@ return [
      *
      * @var string
      */
-    'version' => '8.2.0b1',
-    'version_installed' => '8.2.0b1',
-    'version_db' => '20170424000000', // the key of the latest database migration
+    'version' => '8.4.1a1',
+    'version_installed' => '8.4.1a1',
+    'version_db' => '20180609000000', // the key of the latest database migration
 
     /*
      * Installation status
@@ -219,7 +219,7 @@ return [
                     'core_filesystem' => [
                         'class' => \Concrete\Core\Cache\Driver\FileSystemStashDriver::class,
                         'options' => [
-                            'path' => DIR_FILES_UPLOADED_STANDARD . '/cache',
+                            'path' => DIR_FILES_UPLOADED_STANDARD . '/cache/overrides',
                             'dirPermissions' => DIRECTORY_PERMISSIONS_MODE_COMPUTED,
                             'filePermissions' => FILE_PERMISSIONS_MODE_COMPUTED,
                         ],
@@ -236,7 +236,7 @@ return [
                     'core_filesystem' => [
                         'class' => \Concrete\Core\Cache\Driver\FileSystemStashDriver::class,
                         'options' => [
-                            'path' => DIR_FILES_UPLOADED_STANDARD . '/cache',
+                            'path' => DIR_FILES_UPLOADED_STANDARD . '/cache/expensive',
                             'dirPermissions' => DIRECTORY_PERMISSIONS_MODE_COMPUTED,
                             'filePermissions' => FILE_PERMISSIONS_MODE_COMPUTED,
                         ],
@@ -254,7 +254,7 @@ return [
         ],
 
         'clear' => [
-            'thumbnails' => false
+            'thumbnails' => false,
         ],
     ],
 
@@ -316,7 +316,7 @@ return [
         ],
     ],
 
-/*
+    /*
      * ------------------------------------------------------------------------
      * Email settings
      * ------------------------------------------------------------------------
@@ -340,6 +340,10 @@ return [
             'name' => null,
         ],
         'validate_registration' => [
+            'address' => null,
+            'name' => null,
+        ],
+        'workflow_notification' => [
             'address' => null,
             'name' => null,
         ],
@@ -408,13 +412,6 @@ return [
         'intelligent_search_help' => true,
 
         /*
-         * Display an overlay with up-to-date news from concrete5
-         *
-         * @var bool concrete.external.news_overlay
-         */
-        'news_overlay' => false,
-
-        /*
          * Enable concrete5 news within your site
          *
          * @var bool concrete.external.news
@@ -449,6 +446,10 @@ return [
          * The default thumbnail format: jpeg, png, auto (if auto: we'll create a jpeg if the source image is jpeg, we'll create a png otherwise).
          */
         'default_thumbnail_format' => 'auto',
+        /*
+         * @var string (now|async)
+         */
+        'basic_thumbnailer_generation_strategy' => 'now',
         'help_overlay' => true,
         'require_version_comments' => false,
     ],
@@ -488,6 +489,7 @@ return [
         'file_manager_detail' => [
             'handle' => 'file_manager_detail',
             'width' => 400,
+            'height' => 400,
         ],
         'user_avatar' => [
             'width' => 80,
@@ -500,6 +502,7 @@ return [
         'images' => [
             'use_exif_data_to_rotate_images' => false,
             'manipulation_library' => 'gd',
+            'create_high_dpi_thumbnails' => true,
         ],
         'results' => 10,
     ],
@@ -561,7 +564,8 @@ return [
          * @var bool
          */
         'choose_language_login' => false,
-
+        // Fetch language files when installing a package connected to the marketplace [boolean]
+        'auto_install_package_languages' => true,
         // Community Translation instance offering concrete5 translations
         'community_translation' => [
             // API entry point of the Community Translation instance
@@ -572,6 +576,8 @@ return [
             'progress_limit' => 60,
             // Lifetime (in seconds) of the cache items associated to downloaded data
             'cache_lifetime' => 3600, // 1 hour
+            // Base URI for package details
+            'package_url' => 'https://translate.concrete5.org/translate/package',
         ],
     ],
     'urls' => [
@@ -579,6 +585,7 @@ return [
         'concrete5_secure' => 'https://www.concrete5.org',
         'newsflow' => 'http://newsflow.concrete5.org',
         'background_feed' => '//backgroundimages.concrete5.org/wallpaper',
+        'privacy_policy' => '//www.concrete5.org/legal/privacy-policy',
         'background_feed_secure' => 'https://backgroundimages.concrete5.org/wallpaper',
         'background_info' => 'http://backgroundimages.concrete5.org/get_image_data.php',
         'videos' => 'https://www.youtube.com/user/concrete5cms/videos',
@@ -596,7 +603,7 @@ return [
                 'connect_success' => '/marketplace/connect/-/connected',
                 'connect_validate' => '/marketplace/connect/-/validate',
                 'connect_new_token' => '/marketplace/connect/-/generate_token',
-                'checkout' => '/cart/-/add/',
+                'checkout' => '/cart/-/add',
                 'purchases' => '/marketplace/connect/-/get_available_licenses',
                 'item_information' => '/marketplace/connect/-/get_item_information',
                 'item_free_license' => '/marketplace/connect/-/enable_free_license',
@@ -687,6 +694,16 @@ return [
             'email_registration' => false,
 
             /*
+             * Determines whether the username field is displayed when registering
+             */
+            'display_username_field' => true,
+
+            /*
+             * Determines whether the confirm password field is displayed when registering
+             */
+            'display_confirm_password_field' => true,
+
+            /*
              * Validate emails during registration
              *
              * @var bool
@@ -760,6 +777,18 @@ return [
 
     /*
      * ------------------------------------------------------------------------
+     * Calendar
+     * ------------------------------------------------------------------------
+     */
+    'calendar' => [
+        'colors' => [
+            'text' => '#ffffff',
+            'background' => '#3A87AD',
+        ],
+    ],
+
+    /*
+     * ------------------------------------------------------------------------
      * Security
      * ------------------------------------------------------------------------
      */
@@ -771,21 +800,13 @@ return [
         ],
         'ban' => [
             'ip' => [
+                // Is the automatic ban system enabled?
                 'enabled' => true,
-
-                /*
-                 * Maximum attempts
-                 */
+                // Maximum number of login attempts before banning the IP address
                 'attempts' => 5,
-
-                /*
-                 * Threshold time
-                 */
+                // Time window (in seconds) for past failed login attempts
                 'time' => 300,
-
-                /*
-                 * Ban length in minutes
-                 */
+                // Ban duration (in minutes) when <attempts> failed logins occurred in the past <time> seconds
                 'length' => 10,
             ],
         ],
@@ -856,7 +877,7 @@ return [
         'url_rewriting_all' => false,
         'redirect_to_canonical_url' => false,
         'canonical_url' => null,
-        'canonical_ssl_url' => null,
+        'canonical_url_alternative' => null,
         'trailing_slash' => false,
         'title_format' => '%2$s :: %1$s',
         'title_segment_separator' => ' :: ',
@@ -891,5 +912,16 @@ return [
             // Always reindex pages (usually it isn't performed when approving workflows)
             'always_reindex' => false,
         ],
+    ],
+
+    'editor' => [
+        'plugins' => [
+            'selected' => [],
+        ],
+    ],
+
+    'composer' => [
+        // [float] The time in seconds until idle triggers a save (set to 0 to disable autosave)
+        'idle_timeout' => 1,
     ],
 ];

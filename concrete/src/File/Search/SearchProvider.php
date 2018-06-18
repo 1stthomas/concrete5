@@ -12,6 +12,7 @@ use Concrete\Core\File\Search\ColumnSet\Available;
 use Concrete\Core\File\Search\ColumnSet\ColumnSet;
 use Concrete\Core\Search\QueryableInterface;
 use Symfony\Component\HttpFoundation\Session\Session;
+use Concrete\Core\Entity\Search\SavedFileSearch;
 
 class SearchProvider extends AbstractSearchProvider implements QueryableInterface
 {
@@ -56,7 +57,12 @@ class SearchProvider extends AbstractSearchProvider implements QueryableInterfac
 
     public function getItemList()
     {
-        return new FileList();
+        $list = new FileList();
+        $list->setPermissionsChecker(function ($file) {
+            $fp = new \Permissions($file);
+            return $fp->canViewFileInFileManager();
+        });
+        return $list;
     }
 
     public function createSearchResultObject($columns, $list)
@@ -64,7 +70,9 @@ class SearchProvider extends AbstractSearchProvider implements QueryableInterfac
         return new Result($columns, $list);
     }
 
-
-
-
+    function getSavedSearch()
+    {
+        return new SavedFileSearch();
+    }
+    
 }

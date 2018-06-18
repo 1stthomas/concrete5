@@ -5,10 +5,6 @@ use Concrete\Controller\Panel\Dashboard as DashboardPanel;
 
 defined('C5_EXECUTE') or die('Access Denied.');
 
-if (Request::getInstance()->get('_ccm_dashboard_external')) {
-    return;
-}
-
 $app = Application::getFacadeApplication();
 
 $html = $app->make('helper/html');
@@ -53,7 +49,7 @@ $large_font = (bool) $config->get('concrete.accessibility.toolbar_large_font');
 </head>
 <body <?php if (isset($bodyClass)) { ?>class="<?=$bodyClass?>"<?php } ?>>
     <div id="ccm-dashboard-page" class="<?php if ($view->section('/account')) { ?>ccm-dashboard-my-account<?php } ?> ccm-ui">
-        <div class="ccm-mobile-menu-overlay ccm-mobile-menu-overlay-dashboard hidden-md hidden-lg">
+        <div class="ccm-mobile-menu-overlay ccm-mobile-menu-overlay-dashboard hidden-md hidden-lg" style="height: calc(100vh - 48px);">
             <div class="ccm-mobile-menu-main">
                 <ul class="ccm-mobile-menu-entries">
                     <li>
@@ -63,7 +59,7 @@ $large_font = (bool) $config->get('concrete.accessibility.toolbar_large_font');
                         ?>
                     </li>
                     <li>
-                        <i class="fa fa-sign-out mobile-leading-icon"></i><a href="<?= URL::to('/login', 'logout', $valt->generate('logout')); ?>"><?= t('Sign Out'); ?></a>
+                        <i class="fa fa-sign-out mobile-leading-icon"></i><a href="<?= URL::to('/login', 'do_logout', $valt->generate('do_logout')); ?>"><?= t('Sign Out'); ?></a>
                     </li>
                 </ul>
             </div>

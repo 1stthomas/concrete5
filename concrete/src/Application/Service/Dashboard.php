@@ -22,9 +22,11 @@ class Dashboard
     public function canRead()
     {
         $c = Page::getByPath('/dashboard', 'ACTIVE');
-        $cp = new Permissions($c);
+        if ($c && !$c->isError()) {
+            $cp = new Permissions($c);
 
-        return $cp->canViewPage();
+            return $cp->canViewPage();
+        }
     }
 
     /**
@@ -199,49 +201,6 @@ class Dashboard
     }
 
     /**
-     * @return \stdClass
-     */
-    public function getDashboardBackgroundImage()
-    {
-        // this feed is an array of standard PHP objects with a SRC, a caption, and a URL
-        // allow for a custom white-label feed
-        $filename = date('Ymd') . '.jpg';
-        $obj = new \stdClass();
-        $obj->checkData = false;
-        $obj->displayCaption = false;
-        $image = '';
-
-        if (Config::get('concrete.white_label.dashboard_background')) {
-            $image = Config::get('concrete.white_label.dashboard_background');
-            if ($image == 'none') {
-                $image = '';
-            }
-        } else {
-            $obj->checkData = true;
-            $imageSetting = Config::get('concrete.misc.dashboard_background_image');
-            if ($imageSetting == 'custom') {
-                $fo = File::getByID(Config::get('concrete.misc.dashboard_background_image_fid'));
-                if (is_object($fo)) {
-                    $image = $fo->getRelativePath();
-                }
-            } elseif ($imageSetting == 'none') {
-                $image = '';
-            } else {
-                if (isset($_SERVER['HTTPS']) && ($_SERVER['HTTPS'] == 'on')) {
-                    $image = Config::get('concrete.urls.background_feed_secure') . '/' . $filename;
-                } else {
-                    $image = Config::get('concrete.urls.background_feed') . '/' . $filename;
-                }
-                $obj->displayCaption = true;
-            }
-        }
-        $obj->filename = $filename;
-        $obj->image = $image;
-
-        return $obj;
-    }
-
-    /**
      * @return mixed
      */
     public function getIntelligentSearchMenu()
@@ -254,10 +213,15 @@ class Dashboard
             return $dashboardMenus[$dashboardMenusKey];
         }
 
+        $page = Page::getByPath('/dashboard');
+        if (!$page || $page->isError()) {
+            return '';
+        }
+
+
         ob_start(); ?>
         <div id="ccm-intelligent-search-results">
             <?php
-            $page = Page::getByPath('/dashboard');
         $children = $page->getCollectionChildrenArray(true);
         $navHelper = Core::make('helper/navigation');
         $packagepages = [];
@@ -505,7 +469,6 @@ class DefaultDashboardMenu extends DashboardMenu
         '/dashboard/sitemap/search',
         '/dashboard/files/search',
         '/dashboard/files/sets',
-        '/dashboard/reports/statistics',
         '/dashboard/reports/forms',
     ];
 }

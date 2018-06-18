@@ -30,6 +30,14 @@
             <unsigned/>
             <default value="0" />
         </field>
+        <field name="fileLinkID" type="integer">
+            <unsigned/>
+            <default value="0" />
+        </field>
+        <field name="openLinkInNewWindow" type="boolean">
+            <default value="0"/>
+            <notnull/>
+        </field>
         <field name="altText" type="string" size="255" />
         <field name="title" type="string" size="255" />
         <index name="fID">

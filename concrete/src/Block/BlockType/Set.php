@@ -2,13 +2,13 @@
 namespace Concrete\Core\Block\BlockType;
 
 use Concrete\Core\Entity\Block\BlockType\BlockType as BlockTypeEntity;
-use Concrete\Core\Foundation\Object;
+use Concrete\Core\Foundation\ConcreteObject;
 use Doctrine\DBAL\Connection;
 use Loader;
 use Core;
 use Concrete\Core\Package\PackageList;
 
-class Set extends Object
+class Set extends ConcreteObject
 {
     public static function getByID($btsID)
     {
@@ -67,7 +67,7 @@ class Set extends Object
         if (count($excluded)) {
             $r = $db->executeQuery('select btsID from BlockTypeSets where btsHandle not in (?) order by btsDisplayOrder asc',
                 array($excluded),
-                array(Connection::PARAM_INT_ARRAY));
+                array(Connection::PARAM_STR_ARRAY));
         } else {
             $r = $db->executeQuery('select btsID from BlockTypeSets order by btsDisplayOrder asc');
         }
